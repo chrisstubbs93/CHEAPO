@@ -27,22 +27,21 @@ volatile int txj;
 unsigned int count=0;
 boolean setgpsmode;
 boolean gps_set_sucess;
-//char timechara[9];
 int alt;
 int sats;
 char latstr[10] = "0";
 char lonstr[10] = "0";
 unsigned long time;
-
+boolean radioready;
+int gpsmode;
 
 rfm22 radio1(RFM22B_PIN);
 
 void setup()
 {
-
+  pinMode(RFM22B_SDN, OUTPUT);    // RFM22B SDN is on ARDUINO D9
   delay(5000);// let the GPS settle down
   Serial.begin(9600);
-
   initialise_interrupt();
   setupRadio();
 }
@@ -75,7 +74,7 @@ void loop()
     if(setgpsmode == false)
     {
       uint8_t setNav[] = {
-        0xB5, 0x62, 0x06, 0x24, 0x24, 0x00, 0xFF, 0xFF, 0x06, 0x03, 0x00, 0x00, 0x00, 0x00, 0x10, 0x27, 0x00, 0x00, 0x05, 0x00, 0xFA, 0x00, 0xFA, 0x00, 0x64, 0x00, 0x2C, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x16, 0xDC            };
+        0xB5, 0x62, 0x06, 0x24, 0x24, 0x00, 0xFF, 0xFF, 0x06, 0x03, 0x00, 0x00, 0x00, 0x00, 0x10, 0x27, 0x00, 0x00, 0x05, 0x00, 0xFA, 0x00, 0xFA, 0x00, 0x64, 0x00, 0x2C, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x16, 0xDC                              };
       while(!gps_set_sucess)
       {
         sendUBX(setNav, sizeof(setNav)/sizeof(uint8_t));
@@ -104,16 +103,14 @@ void loop()
 
     //String tstring =  String(time, DEC); 
     time = time / 100;
-    
-    
+
+
     //correct no of 0's in long, (output: 00.575950/-0.575950)
     if (lonstr[0] == ' ') {
       lonstr[0] = '0';
     }
   }
 
-
-  int gpsmode = 0;
 
   if(setgpsmode){
     gpsmode = 1;
@@ -122,15 +119,9 @@ void loop()
     gpsmode = 0;
   }
 
-  sprintf(datastring,"$$$$CHEAPO,%i,%lu,%s,%s,%i,%i,%i",count,time,latstr,lonstr,alt,sats,gpsmode); //put together all var into one string //now runs at end of loop()
-  crccat(datastring + 4); //add checksum (lunars code)
-
-  //unsigned int CHECKSUM = gps_CRC16_checksum(datastring);  // Calculates the checksum for this datastring
-  // char checksum_str[6];
-  // sprintf(checksum_str, "*%04X\n", CHECKSUM);
-  // strcat(datastring,checksum_str);
-
-  count = count + 1;
+  //  sprintf(datastring,"$$$$CHEAPO,%i,%lu,%s,%s,%i,%i,%i",count,time,latstr,lonstr,alt,sats,gpsmode); //put together all var into one string //now runs at end of loop()
+  //  crccat(datastring + 4); //add checksum (lunars code)
+  //  count = count + 1;
   delay(1000);
 
 }
@@ -138,64 +129,78 @@ void loop()
 //Timer that fires to send each RTTY bit. From Upu
 ISR(TIMER1_COMPA_vect)
 {
-  switch(txstatus) {
-  case 0: // This is the optional delay between transmissions.
-    txj++;
-    if(txj>(TXDELAY*RTTY_BAUD)) {
-      txj=0;
-      txstatus=1;
-    }
-    break;
-  case 1: // Initialise transmission, take a copy of the string so it doesn't change mid transmission.
-    strcpy(txstring,datastring);
-    txstringlength=strlen(txstring);
-    txstatus=2;
-    txj=0;
-    break;
-  case 2: // Grab a char and lets go transmit it.
-    if ( txj < txstringlength)
-    {
-      txc = txstring[txj];
+  if (radioready == true)
+  {
+    switch(txstatus) {
+    case 0: // This is the optional delay between transmissions.
       txj++;
-      txstatus=3;
-      rtty_txbit (0); // Start Bit;
-      txi=0;
-    }
-    else
-    {
-      txstatus=0; // Should be finished
+      if(txj>(TXDELAY*RTTY_BAUD)) {
+        txj=0;
+        txstatus=1;
+      }
+      break;
+    case 1: // Initialise transmission, take a copy of the string so it doesn't change mid transmission.
+      sprintf(datastring,"$$$$CHEAPO,%i,%lu,%s,%s,%i,%i,%i",count,time,latstr,lonstr,alt,sats,gpsmode); //put together all var into one string //now runs at end of loop()
+      crccat(datastring + 4); //add checksum (lunars code)
+      count = count + 1;
+      strcpy(txstring,datastring);
+      txstringlength=strlen(txstring);
+      txstatus=2;
       txj=0;
-    }
-    break;
-  case 3:
-    if(txi<ASCII)
-    {
-      txi++;
-      if (txc & 1) rtty_txbit(1);
-      else rtty_txbit(0);  
-      txc = txc >> 1;
       break;
-    }
-    else
-    {
-      rtty_txbit (1); // Stop Bit
-      txstatus=4;
-      txi=0;
-      break;
-    }
-  case 4:
-    if(STOPBITS==2)
-    {
-      rtty_txbit (1); // Stop Bit
-      txstatus=2;
-      break;
-    }
-    else
-    {
-      txstatus=2;
-      break;
-    }
+    case 2: // Grab a char and lets go transmit it.
+      if ( txj < txstringlength)
+      {
+        txc = txstring[txj];
+        txj++;
+        txstatus=3;
+        rtty_txbit (0); // Start Bit;
+        txi=0;
+      }
+      else
+      {
+        txstatus=0; // Should be finished
+        txj=0;
 
+        //power cycle
+        if(count % 20 == 0)
+        {
+          powercycle();
+        }
+
+
+      }
+      break;
+    case 3:
+      if(txi<ASCII)
+      {
+        txi++;
+        if (txc & 1) rtty_txbit(1);
+        else rtty_txbit(0);  
+        txc = txc >> 1;
+        break;
+      }
+      else
+      {
+        rtty_txbit (1); // Stop Bit
+        txstatus=4;
+        txi=0;
+        break;
+      }
+    case 4:
+      if(STOPBITS==2)
+      {
+        rtty_txbit (1); // Stop Bit
+        txstatus=2;
+        break;
+      }
+      else
+      {
+        txstatus=2;
+        break;
+      }
+
+    }
   }
 }
 
@@ -214,7 +219,6 @@ void rtty_txbit (int bit)
 
 //Turn on and set up the RFM22B radio transmitter. By Upu
 void setupRadio(){
-  pinMode(RFM22B_SDN, OUTPUT);    // RFM22B SDN is on ARDUINO D9
   digitalWrite(RFM22B_SDN, LOW);
   delay(1000);
   rfm22::initSPI();
@@ -227,24 +231,8 @@ void setupRadio(){
   radio1.write(0x6D, 0x04);// turn tx low power 11db
   radio1.write(0x07, 0x08);
   delay(500);
+  radioready = true;
 }
-
-//I think this code is now redundant
-uint16_t gps_CRC16_checksum (char *string)
-{
-  size_t i;
-  uint16_t crc;
-  uint8_t c;
-  crc = 0xFFFF;
-  // Calculate checksum ignoring the first two $s
-  for (i = 5; i < strlen(string); i++)
-  {
-    c = string[i];
-    crc = _crc_xmodem_update (crc, c);
-  }
-
-  return crc;
-}  
 
 
 //Start the timer interrupt to send RTTY bits. By Upu
@@ -346,5 +334,17 @@ uint16_t crccat(char *msg)
   snprintf(msg, 8, "*%04X\n", x);
   return(x);
 }
+
+void powercycle()
+{
+  cli();
+  radioready = false;
+  digitalWrite(RFM22B_SDN, HIGH); //power down radio
+  delay(1000); //pause 500ms
+  setupRadio(); //turn on radio and set up
+  sei();
+}
+
+
 
 
