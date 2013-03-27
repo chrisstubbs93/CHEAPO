@@ -7,32 +7,42 @@
 #include <TinyGPS.h>
 TinyGPS gps;
 
-#define ASCII 7          // ASCII 7 or 8
-#define STOPBITS 2       // Either 1 or 2
+#define ASCII 7          // 7 bit ascii
+#define STOPBITS 2       // 2 stop bits
 #define TXDELAY 0        // Delay between sentence TX's
 #define RTTY_BAUD 50    // Baud rate for use with RFM22B Max = 600
-#define RADIO_FREQUENCY 434.300
+#define RADIO_FREQUENCY 434.300 // Low side frequency for transmission
+#define RADIO_POWER  0x04 //Radio power (12mW)
+#define RESTART_INTERVAL  50 //Restart rfm22b every x lines
 
+/* Radio output power settings:
+0x02 5db (3mW)
+0x03 8db (6mW)
+0x04 11db (12mW)
+0x05 14db (25mW)
+0x06 17db (50mW)
+0x07 20db (100mW)
+*/
 
 #define RFM22B_SDN 9 //RFM Power
 #define RFM22B_PIN 10 //RFM SPI pin
 
-char datastring[80];
-char txstring[80];
+char datastring[80]; //where the telementry string is stored
+char txstring[80]; //copy of telementry string for transmission
 volatile int txstatus=1;
 volatile int txstringlength=0;
 volatile char txc;
 volatile int txi;
 volatile int txj;
-unsigned int count=0;
-boolean setgpsmode;
+unsigned int count=0; //message counter
+boolean setgpsmode; //has GPS been set to flight mode
 boolean gps_set_sucess;
-int alt;
+int alt; 
 int sats;
 char latstr[10] = "0";
 char lonstr[10] = "0";
 unsigned long time;
-boolean radioready;
+boolean radioready; //is the radio ready or down for reboot
 int gpsmode;
 
 rfm22 radio1(RFM22B_PIN);
@@ -101,7 +111,7 @@ void loop()
     // time in hhmmsscc, date in ddmmyy
     gps.get_datetime(0, &time, &fix_age);
 
-    //String tstring =  String(time, DEC); 
+    //drop cc (millis) from time to leave us with HHMMSS
     time = time / 100;
 
 
@@ -110,8 +120,13 @@ void loop()
       lonstr[0] = '0';
     }
   }
+  else {
+  // No new GPS data, probably no satelites or comms failure. Set the sats flag to 0 to tell habitat its an old fix
+  sats = 0;
+  }
 
 
+  //I didnt figure out how to sprintf a boolean, so use an integer instead for the IsFlightModeSet flag.
   if(setgpsmode){
     gpsmode = 1;
   } 
@@ -119,9 +134,8 @@ void loop()
     gpsmode = 0;
   }
 
-  //  sprintf(datastring,"$$$$CHEAPO,%i,%lu,%s,%s,%i,%i,%i",count,time,latstr,lonstr,alt,sats,gpsmode); //put together all var into one string //now runs at end of loop()
-  //  crccat(datastring + 4); //add checksum (lunars code)
-  //  count = count + 1;
+
+  //Im not sure if this delay is needed. But leaving it in for safekeeping.
   delay(1000);
 
 }
@@ -129,7 +143,7 @@ void loop()
 //Timer that fires to send each RTTY bit. From Upu
 ISR(TIMER1_COMPA_vect)
 {
-  if (radioready == true)
+  if (radioready == true) //is the radio up and running? if not its down for reboot
   {
     switch(txstatus) {
     case 0: // This is the optional delay between transmissions.
@@ -163,7 +177,7 @@ ISR(TIMER1_COMPA_vect)
         txj=0;
 
         //power cycle
-        if(count % 20 == 0)
+        if(count % RESTART_INTERVAL == 0)
         {
           powercycle();
         }
@@ -201,10 +215,13 @@ ISR(TIMER1_COMPA_vect)
       }
 
     }
+  } else
+  {
+ // do nothing, radio is resetting.
   }
 }
 
-//Switch the radios frequency Low/High depending on the current bit. By Upu
+//Switch the radios frequency Low/High depending on the current bit.
 void rtty_txbit (int bit)
 {
   if (bit)
@@ -217,7 +234,7 @@ void rtty_txbit (int bit)
   }
 }
 
-//Turn on and set up the RFM22B radio transmitter. By Upu
+//Turn on and set up the RFM22B radio transmitter.
 void setupRadio(){
   digitalWrite(RFM22B_SDN, LOW);
   delay(1000);
@@ -228,14 +245,14 @@ void setupRadio(){
   radio1.write(0x0b,0x12);
   radio1.write(0x0c,0x15);
   radio1.setFrequency(RADIO_FREQUENCY);
-  radio1.write(0x6D, 0x04);// turn tx low power 11db
+  radio1.write(0x6D, RADIO_POWER);
   radio1.write(0x07, 0x08);
   delay(500);
   radioready = true;
 }
 
 
-//Start the timer interrupt to send RTTY bits. By Upu
+//Start the timer interrupt to send RTTY bits.
 void initialise_interrupt()
 {
   // initialize Timer1
@@ -299,7 +316,7 @@ boolean getUBX_ACK(uint8_t *MSG) {
       return true;
     }
 
-    // Timeout if no valid response in 3 seconds
+    // Timeout if no valid response in 3 seconds, if this keeps happeneing check GPS TX/RX and data voltage levels.
     if (millis() - startTime > 3000) { 
       //Serial.println(" (FAILED!)");
       return false;
@@ -322,10 +339,7 @@ boolean getUBX_ACK(uint8_t *MSG) {
   }
 }
 
-
-
-// calc CRC-CCITT (0xFFFF)
-// Datastring CRC16 Checksum Mechanism from Lunar_Lander
+// CRC16 Checksum from Lunar_Lander
 uint16_t crccat(char *msg)
 {
   uint16_t x;
@@ -335,14 +349,20 @@ uint16_t crccat(char *msg)
   return(x);
 }
 
+
+//Reboot radio
 void powercycle()
 {
-  cli();
   radioready = false;
-  digitalWrite(RFM22B_SDN, HIGH); //power down radio
-  delay(1000); //pause 500ms
+   
+   //The delay dosent seem to do anything, so run it loads of times. One day I will look into this.
+    for (int i = 0; i < 50; i++)  {
+    digitalWrite(RFM22B_SDN, HIGH); //power down radio
+    delay(500); //pause 500ms   
+    }
+  
+  delay(500); //Attempt to pause 500ms. Not that delay() does anything here.
   setupRadio(); //turn on radio and set up
-  sei();
 }
 
 
