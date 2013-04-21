@@ -37,7 +37,7 @@ volatile int txj;
 unsigned int count=0; //message counter
 boolean setgpsmode; //has GPS been set to flight mode
 boolean gps_set_sucess;
-int alt; 
+unsigned int alt; 
 int sats;
 char latstr[10] = "0";
 char lonstr[10] = "0";
@@ -79,7 +79,7 @@ void loop()
 
 
     // if we have a GPS fix. then set the ublox into flight mode. Flight mode code by Upu
-    delay(500);
+    delay(1000);
 
     if(setgpsmode == false)
     {
@@ -154,7 +154,7 @@ ISR(TIMER1_COMPA_vect)
       }
       break;
     case 1: // Initialise transmission, take a copy of the string so it doesn't change mid transmission.
-      sprintf(datastring,"$$$$CHEAPO,%i,%lu,%s,%s,%i,%i,%i",count,time,latstr,lonstr,alt,sats,gpsmode); //put together all var into one string //now runs at end of loop()
+      sprintf(datastring,"$$$$CHEAPO,%i,%06lu,%s,%s,%i,%i,%i",count,time,latstr,lonstr,alt,sats,gpsmode); //put together all var into one string //now runs at end of loop()
       crccat(datastring + 4); //add checksum (lunars code)
       count = count + 1;
       strcpy(txstring,datastring);

@@ -1,3 +1,6 @@
 Flight code for $$CHEAPO flight computer
 
 Just a simple uBlox NEO 6 GPS / RFM22B tracker
+
+
+Should be uploaded to "Arduino Pro or Pro Mini (3.3v, 8MHz) w/ ATmegs168p (breakout)
