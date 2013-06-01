@@ -44,6 +44,9 @@ char lonstr[10] = "0";
 unsigned long time;
 boolean radioready; //is the radio ready or down for reboot
 int gpsmode;
+int vbattadc = 0;
+float vbatt = 0.00;
+char vbatts[10] = "0";
 
 rfm22 radio1(RFM22B_PIN);
 
@@ -154,7 +157,10 @@ ISR(TIMER1_COMPA_vect)
       }
       break;
     case 1: // Initialise transmission, take a copy of the string so it doesn't change mid transmission.
-      sprintf(datastring,"$$$$CHEAPO,%i,%06lu,%s,%s,%i,%i,%i",count,time,latstr,lonstr,alt,sats,gpsmode); //put together all var into one string //now runs at end of loop()
+      vbattadc = analogRead(A0); 
+      vbatt = (3.2 / 1024)* vbattadc * 11.2;
+      dtostrf(vbatt,3,2,vbatts); // convert lat from float to string
+      sprintf(datastring,"$$$$CHEAPO,%i,%06lu,%s,%s,%i,%i,%i,%s",count,time,latstr,lonstr,alt,sats,gpsmode,vbatts); //put together all var into one string //now runs at end of loop()
       crccat(datastring + 4); //add checksum (lunars code)
       count = count + 1;
       strcpy(txstring,datastring);
