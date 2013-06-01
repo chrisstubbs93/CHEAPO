@@ -36,24 +36,23 @@ volatile int txi;
 volatile int txj;
 unsigned int count=0; //message counter
 boolean setgpsmode; //has GPS been set to flight mode
-boolean gps_set_sucess;
+boolean gps_set_sucess; //is flight mode set (bool)
 unsigned int alt; 
 int sats;
-char latstr[10] = "0";
-char lonstr[10] = "0";
+char latstr[10] = "0"; //Lat converted to string
+char lonstr[10] = "0"; //Lng converted to string
 unsigned long time;
 boolean radioready; //is the radio ready or down for reboot
-int gpsmode;
-int vbattadc = 0;
-float vbatt = 0.00;
-char vbatts[10] = "0";
+int gpsmode; //is flight mode set? (int 1/0)
+float vbatt = 0.00; //battery voltage as float
+char vbatts[10] = "0"; //battery voltage as string
 
 rfm22 radio1(RFM22B_PIN);
 
 void setup()
 {
   pinMode(RFM22B_SDN, OUTPUT);    // RFM22B SDN is on ARDUINO D9
-  delay(5000);// let the GPS settle down
+  delay(5000);// let the GPS settle down (probably not needed)
   Serial.begin(9600);
   initialise_interrupt();
   setupRadio();
@@ -157,8 +156,7 @@ ISR(TIMER1_COMPA_vect)
       }
       break;
     case 1: // Initialise transmission, take a copy of the string so it doesn't change mid transmission.
-      vbattadc = analogRead(A0); 
-      vbatt = (3.2 / 1024)* vbattadc * 11.2;
+      vbatt = ((3.2 / 1024)* analogRead(A0) * 11.2); // ((vcc / maxADC)* adcreading * voltageDividerRatio)
       dtostrf(vbatt,3,2,vbatts); // convert lat from float to string
       sprintf(datastring,"$$$$CHEAPO,%i,%06lu,%s,%s,%i,%i,%i,%s",count,time,latstr,lonstr,alt,sats,gpsmode,vbatts); //put together all var into one string //now runs at end of loop()
       crccat(datastring + 4); //add checksum (lunars code)
@@ -359,7 +357,7 @@ uint16_t crccat(char *msg)
 //Reboot radio
 void powercycle()
 {
-  radioready = false;
+  radioready = false; //radio down for reboot
    
    //The delay dosent seem to do anything, so run it loads of times. One day I will look into this.
     for (int i = 0; i < 50; i++)  {
