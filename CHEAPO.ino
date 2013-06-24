@@ -165,7 +165,7 @@ ISR(TIMER1_COMPA_vect)
       radio1.write(0x12, 0x00); // set temp range (-64 - +64 degC)
       radio1.write(0x12, 0x20); // set ENTSOFF (wtf is that?)
       radio1.write(0x0F, 0x80); // RF22_REG_0F_ADC_CONFIGURATION 0x0f  :  RF22_ADCSTART 0x80 Fuck knows what this does, maybe you call it start the ADC? After reading the manual you must set this self clearing bit to get the ADC to take a reading
-      delayMicroseconds(360); //wait > 350 us for ADC converstion
+      delayMicroseconds(400); //wait > 350 us for ADC converstion
       xtemp = radio1.read(0x11); //Register 11h. ADC Value. What units this returns in I have no idea. Degrees bannana? - Oh its an ADC value, so probably 0-255
       caltemp = xtemp * 0.5 - 64 - 7;
       
