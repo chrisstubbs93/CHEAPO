@@ -13,7 +13,7 @@ TinyGPS gps;
 #define RTTY_BAUD 50    // Baud rate for use with RFM22B Max = 600
 #define RADIO_FREQUENCY 434.300 // Low side frequency for transmission
 #define RADIO_POWER  0x04 //Radio power (12mW)
-
+//byte RADIO_POWER = 0x05;
 #define RESTART_INTERVAL  50 //Restart rfm22b every x lines
 
 /* Radio output power settings:
@@ -55,13 +55,20 @@ int caltemp = 0;
 double hlat = 51.710119;
 double hlon = 0.577744;
 float dist;
-char diststr[5] = "0"; //dist converted to string
+char diststr[2] = "0"; //dist converted to string
 int R = 6371;
+
+boolean recording; //is the 808 recording
 
 rfm22 radio1(RFM22B_PIN);
 
 void setup()
 {
+  //setup 808
+  pinMode(A1, OUTPUT); 
+  pinMode(A2, OUTPUT); 
+  digitalWrite(A2, HIGH);    // Keep 808 record HIGH so we can pull it low to start after power on
+  
   pinMode(RFM22B_SDN, OUTPUT);    // RFM22B SDN is on ARDUINO D9
   delay(5000);// let the GPS settle down (probably not needed)
   Serial.begin(9600);
@@ -126,36 +133,19 @@ void loop()
     
     
     //Haversine distance calculation. Isnt very good on the arduino due to the float precision
-    float dLat = ((flat - hlat) * 71) / 4068;
-    float dLon = ((flon - hlon) * 71) / 4068;
-    float lat1 = ((hlat) * 71) / 4068;
-    float lat2 = ((hlon) * 71) / 4068;
-    float a = sin(dLat/2) * sin(dLat/2) + sin(dLon/2) * sin(dLon/2) * cos(lat1) * cos(lat2);
-    float c = 2 * atan2(sqrt(a),sqrt(1-a));
-    dist = R * c;
-    dtostrf(dist,4,2,diststr); // convert dist from float to string
-      
-    
-    if(flon < -6.00){
-      //byte RADIO_POWER = 0x06; //50mw for int waters (ish)
-      //setupRadio();
-    }
-    
+  //  float dLat = ((flat - hlat) * 71) / 4068;
+  //  float dLon = ((flon - hlon) * 71) / 4068;
+  //  float lat1 = ((hlat) * 71) / 4068;
+  //  float lat2 = ((hlon) * 71) / 4068;
+   // float a = sin(dLat/2) * sin(dLat/2) + sin(dLon/2) * sin(dLon/2) * cos(lat1) * cos(lat2);
+  //  float c = 2 * atan2(sqrt(a),sqrt(1-a));
+  //  dist = R * c;
+  //  dtostrf(dist,4,2,diststr); // convert dist from float to string
       
 
     unsigned long fix_age;
     
     
-    if(sats > 5)
-    {
-        if(gps_powersave == false)
-          {
-            uint8_t setPSM[] = { 0xB5, 0x62, 0x06, 0x11, 0x02, 0x00, 0x08, 0x01, 0x22, 0x92 }; // Setup for Power Save Mode (Default Cyclic 1s)
-            sendUBX(setPSM, sizeof(setPSM)/sizeof(uint8_t)); // send command to ublox
-            gps_powersave = true;
-          }
-    }
-
 
     // time in hhmmsscc, date in ddmmyy
     gps.get_datetime(0, &time, &fix_age);
@@ -168,12 +158,33 @@ void loop()
     if (lonstr[0] == ' ') {
       lonstr[0] = '0';
     }
+    
+    if(sats > 5)
+    {
+        if(gps_powersave == false)
+          {
+            uint8_t setPSM[] = { 0xB5, 0x62, 0x06, 0x11, 0x02, 0x00, 0x08, 0x01, 0x22, 0x92 }; // Setup for Power Save Mode (Default Cyclic 1s)
+            sendUBX(setPSM, sizeof(setPSM)/sizeof(uint8_t)); // send command to ublox
+            gps_powersave = true;
+          }
+       
+    }
+    
+    if(alt>30000){
+       //start 808 recording
+       if(recording == false){
+         record();
+         recording = true;
+       }
+    }
+
   }
   else {
   // No new GPS data, probably no satelites or comms failure. Set the sats flag to 0 to tell habitat its an old fix
   sats = 0;
   }
 
+  
 
   //I didnt figure out how to sprintf a boolean, so use an integer instead for the IsFlightModeSet flag.
   if(setgpsmode){
@@ -434,6 +445,18 @@ void powercycle()
   setupRadio(); //turn on radio and set up
 }
 
+
+void record() {  
+  digitalWrite(A1, HIGH);    // turn the 808 ON
+  delay(2500); 
+  digitalWrite(A1, LOW);    // turn the 808 ON
+  
+  delay(2500); 
+  digitalWrite(A2, LOW);    // turn the 808 REC
+  delay(3000); 
+  digitalWrite(A2, HIGH);    // turn the 808 REC  
+  dtostrf(1,1,0,diststr); // set to 1
+}
 
 
 
