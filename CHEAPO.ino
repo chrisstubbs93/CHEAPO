@@ -87,6 +87,11 @@ void loop()
     }
   }
 
+    if(setgpsmode == true)
+    {
+    navmode();
+    }
+
   if (newData)
   {
 
@@ -94,19 +99,8 @@ void loop()
     // if we have a GPS fix. then set the ublox into flight mode. Flight mode code by Upu
     delay(1000);
 
-    if(setgpsmode == false)
-    {
-      uint8_t setNav[] = {
-        0xB5, 0x62, 0x06, 0x24, 0x24, 0x00, 0xFF, 0xFF, 0x06, 0x03, 0x00, 0x00, 0x00, 0x00, 0x10, 0x27, 0x00, 0x00, 0x05, 0x00, 0xFA, 0x00, 0xFA, 0x00, 0x64, 0x00, 0x2C, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x16, 0xDC                              };
-      while(!gps_set_sucess)
-      {
-        sendUBX(setNav, sizeof(setNav)/sizeof(uint8_t));
-        gps_set_sucess=getUBX_ACK(setNav);
-        delay(1000);
-      }
-      gps_set_sucess=0;
-      setgpsmode = true;
-    }
+  setgpsmode = true;
+
 
    
     
@@ -115,9 +109,7 @@ void loop()
     unsigned long age;
     gps.f_get_position(&flat, &flon, &age);
     
-    
-    
-    
+
 
     dtostrf(flat,9,6,latstr); // convert lat from float to string
     dtostrf(flon,9,6,lonstr); // convert lon from float to string
@@ -134,14 +126,7 @@ void loop()
     float c = 2 * atan2(sqrt(a),sqrt(1-a));
     dist = R * c;
     dtostrf(dist,4,2,diststr); // convert dist from float to string
-      
-    
-    if(flon < -6.00){
-      //byte RADIO_POWER = 0x06; //50mw for int waters (ish)
-      //setupRadio();
-    }
-    
-      
+           
 
     unsigned long fix_age;
     
@@ -434,6 +419,19 @@ void powercycle()
   setupRadio(); //turn on radio and set up
 }
 
+void navmode()
+  {
+    uint8_t setNav[] = {
+        0xB5, 0x62, 0x06, 0x24, 0x24, 0x00, 0xFF, 0xFF, 0x06, 0x03, 0x00, 0x00, 0x00, 0x00, 0x10, 0x27, 0x00, 0x00, 0x05, 0x00, 0xFA, 0x00, 0xFA, 0x00, 0x64, 0x00, 0x2C, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x16, 0xDC                              };
+      while(!gps_set_sucess)
+      {
+        sendUBX(setNav, sizeof(setNav)/sizeof(uint8_t));
+        gps_set_sucess=getUBX_ACK(setNav);
+        delay(1000);
+      }
+      gps_set_sucess=0;
+      setgpsmode = true;
+  }
 
 
 
