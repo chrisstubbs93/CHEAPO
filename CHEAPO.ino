@@ -87,10 +87,10 @@ void loop()
     }
   }
 
-    if(setgpsmode == true)
-    {
+   //if(setgpsmode == true)
+   // {
     navmode();
-    }
+    //}
 
   if (newData)
   {
@@ -99,7 +99,7 @@ void loop()
     // if we have a GPS fix. then set the ublox into flight mode. Flight mode code by Upu
     delay(1000);
 
-  setgpsmode = true;
+ // setgpsmode = true;
 
 
    
