@@ -74,6 +74,7 @@ void loop()
   bool newData = false;
   unsigned long chars;
   unsigned short sentences, failed;
+  sats = gps.satellites();
 
   // For one second we parse GPS data and report some key values
   for (unsigned long start = millis(); millis() - start < 2000;)
@@ -87,10 +88,10 @@ void loop()
     }
   }
 
-   //if(setgpsmode == true)
-   // {
+   if(setgpsmode == true)
+    {
     navmode();
-    //}
+    }
 
   if (newData)
   {
@@ -99,7 +100,7 @@ void loop()
     // if we have a GPS fix. then set the ublox into flight mode. Flight mode code by Upu
     delay(1000);
 
- // setgpsmode = true;
+  setgpsmode = true;
 
 
    
@@ -114,7 +115,7 @@ void loop()
     dtostrf(flat,9,6,latstr); // convert lat from float to string
     dtostrf(flon,9,6,lonstr); // convert lon from float to string
     alt = gps.f_altitude(); // +/- altitude in meters 
-    sats = gps.satellites();
+    //sats = gps.satellites();
     
     
     //Haversine distance calculation. Isnt very good on the arduino due to the float precision
@@ -202,13 +203,13 @@ ISR(TIMER1_COMPA_vect)
       radio1.write(0x0F, 0x00); // RF22_REG_0F_ADC_CONFIGURATION 0x0f  :  RF22_ADCSEL_INTERNAL_TEMPERATURE_SENSOR 0x00 Temprtature sensor, oo, yes plz
       radio1.write(0x12, 0x00); // set temp range (-64 - +64 degC)
       radio1.write(0x12, 0x20); // set ENTSOFF (wtf is that?)
-      radio1.write(0x0F, 0x80); // RF22_REG_0F_ADC_CONFIGURATION 0x0f  :  RF22_ADCSTART 0x80 Fuck knows what this does, maybe you call it start the ADC? After reading the manual you must set this self clearing bit to get the ADC to take a reading
+      radio1.write(0x0F, 0x80); // RF22_REG_0F_ADC_CONFIGURATION 0x0f  :  RF22_ADCSTART 0x80  After reading the manual you must set this self clearing bit to get the ADC to take a reading
       delayMicroseconds(400); //wait > 350 us for ADC converstion
       xtemp = radio1.read(0x11); //Register 11h. ADC Value. What units this returns in I have no idea. Degrees bannana? - Oh its an ADC value, so probably 0-255
       caltemp = xtemp * 0.5 - 64 - 7;
       
         
-      sprintf(datastring,"$$$$CHEAPO,%i,%06lu,%s,%s,%i,%i,%i,%s,%i,%i,%s",count,time,latstr,lonstr,alt,sats,gpsmode,vbatts,caltemp,psave,diststr); //put together all var into one string //now runs at end of loop()
+      sprintf(datastring,"$$$$CHEAPO,%i,%06lu,%s,%s,%i,%i,%i%i,%s,%i",count,time,latstr,lonstr,alt,sats,gpsmode,psave,vbatts,caltemp); //put together all var into one string //now runs at end of loop()
       crccat(datastring + 4); //add checksum (lunars code)
       count = count + 1;
       strcpy(txstring,datastring);
