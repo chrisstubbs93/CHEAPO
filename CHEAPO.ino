@@ -3,8 +3,8 @@
 #include <util/crc16.h>
 #include <SPI.h>
 #include <RFM22.h>
-
 #include <TinyGPS.h>
+
 TinyGPS gps;
 
 #define ASCII 7          // 7 bit ascii
@@ -13,20 +13,18 @@ TinyGPS gps;
 #define RTTY_BAUD 50    // Baud rate for use with RFM22B Max = 600
 #define RADIO_FREQUENCY 434.300 // Low side frequency for transmission
 #define RADIO_POWER  0x04 //Radio power (12mW)
-
 #define RESTART_INTERVAL  50 //Restart rfm22b every x lines
-
-/* Radio output power settings:
-0x02 5db (3mW)
-0x03 8db (6mW)
-0x04 11db (12mW)
-0x05 14db (25mW)
-0x06 17db (50mW)
-0x07 20db (100mW)
-*/
-
 #define RFM22B_SDN 9 //RFM Power
 #define RFM22B_PIN 10 //RFM SPI pin
+
+/* Radio output power settings:
+ 0x02 5db (3mW)
+ 0x03 8db (6mW)
+ 0x04 11db (12mW)
+ 0x05 14db (25mW)
+ 0x06 17db (50mW)
+ 0x07 20db (100mW)
+ */
 
 char datastring[80]; //where the telementry string is stored
 char txstring[80]; //copy of telementry string for transmission
@@ -40,7 +38,7 @@ boolean setgpsmode; //has GPS been set to flight mode
 boolean gps_set_sucess; //is flight mode set (bool)
 boolean gps_powersave; //is powersave mode set (bool)
 unsigned int alt; 
-int sats;
+int sats = 0;
 int psave;
 char latstr[10] = "0"; //Lat converted to string
 char lonstr[10] = "0"; //Lng converted to string
@@ -52,11 +50,13 @@ char vbatts[10] = "0"; //battery voltage as string
 int xtemp = 0;
 int caltemp = 0;
 
+/*
 double hlat = 51.710119;
 double hlon = 0.577744;
 float dist;
 char diststr[5] = "0"; //dist converted to string
 int R = 6371;
+*/
 
 rfm22 radio1(RFM22B_PIN);
 
@@ -74,9 +74,9 @@ void loop()
   bool newData = false;
   unsigned long chars;
   unsigned short sentences, failed;
-  sats = gps.satellites();
+  //sats = gps.satellites(); //reporting crazy values before fix, tinygps does not report sats anyway without 2d/3d fix
 
-  // For one second we parse GPS data and report some key values
+  // For 2 seconds we parse GPS data and report some key values
   for (unsigned long start = millis(); millis() - start < 2000;)
   {
     while (Serial.available())
@@ -88,58 +88,51 @@ void loop()
     }
   }
 
-   if(setgpsmode == true)
-    {
+  if(setgpsmode == true)
+  {
     navmode();
-    }
+  }
 
   if (newData)
   {
 
-
     // if we have a GPS fix. then set the ublox into flight mode. Flight mode code by Upu
-    delay(1000);
-
-  setgpsmode = true;
-
-
-   
-    
+    delay(250);
+    setgpsmode = true;
 
     float flat, flon;
     unsigned long age;
     gps.f_get_position(&flat, &flon, &age);
-    
-
 
     dtostrf(flat,9,6,latstr); // convert lat from float to string
     dtostrf(flon,9,6,lonstr); // convert lon from float to string
     alt = gps.f_altitude(); // +/- altitude in meters 
-    //sats = gps.satellites();
-    
-    
+    sats = gps.satellites();
+
+    /*
     //Haversine distance calculation. Isnt very good on the arduino due to the float precision
-    float dLat = ((flat - hlat) * 71) / 4068;
-    float dLon = ((flon - hlon) * 71) / 4068;
-    float lat1 = ((hlat) * 71) / 4068;
-    float lat2 = ((hlon) * 71) / 4068;
-    float a = sin(dLat/2) * sin(dLat/2) + sin(dLon/2) * sin(dLon/2) * cos(lat1) * cos(lat2);
-    float c = 2 * atan2(sqrt(a),sqrt(1-a));
-    dist = R * c;
-    dtostrf(dist,4,2,diststr); // convert dist from float to string
-           
+     float dLat = ((flat - hlat) * 71) / 4068;
+     float dLon = ((flon - hlon) * 71) / 4068;
+     float lat1 = ((hlat) * 71) / 4068;
+     float lat2 = ((hlon) * 71) / 4068;
+     float a = sin(dLat/2) * sin(dLat/2) + sin(dLon/2) * sin(dLon/2) * cos(lat1) * cos(lat2);
+     float c = 2 * atan2(sqrt(a),sqrt(1-a));
+     dist = R * c;
+     dtostrf(dist,4,2,diststr); // convert dist from float to string
+     */
 
     unsigned long fix_age;
-    
-    
+
+    //If we have a good fix (>5 sats), enter uBlox Power save mode
     if(sats > 5)
     {
-        if(gps_powersave == false)
-          {
-            uint8_t setPSM[] = { 0xB5, 0x62, 0x06, 0x11, 0x02, 0x00, 0x08, 0x01, 0x22, 0x92 }; // Setup for Power Save Mode (Default Cyclic 1s)
-            sendUBX(setPSM, sizeof(setPSM)/sizeof(uint8_t)); // send command to ublox
-            gps_powersave = true;
-          }
+      if(gps_powersave == false)
+      {
+        uint8_t setPSM[] = { 
+          0xB5, 0x62, 0x06, 0x11, 0x02, 0x00, 0x08, 0x01, 0x22, 0x92         }; // Setup for Power Save Mode (Default Cyclic 1s)
+        sendUBX(setPSM, sizeof(setPSM)/sizeof(uint8_t)); // send command to ublox
+        gps_powersave = true;
+      }
     }
 
 
@@ -149,15 +142,14 @@ void loop()
     //drop cc (millis) from time to leave us with HHMMSS
     time = time / 100;
 
-
     //correct no of 0's in long, (output: 00.575950/-0.575950)
     if (lonstr[0] == ' ') {
       lonstr[0] = '0';
     }
   }
   else {
-  // No new GPS data, probably no satelites or comms failure. Set the sats flag to 0 to tell habitat its an old fix
-  sats = 0;
+    // No new GPS data, probably no satelites or comms failure. Set the sats flag to 0 to tell habitat its an old fix
+    sats = 0;
   }
 
 
@@ -168,19 +160,17 @@ void loop()
   else{
     gpsmode = 0;
   }
-  
+
   //is gps in power save mode?
-   if(gps_powersave){
+  if(gps_powersave){
     psave = 1;
   } 
   else{
     psave = 0;
   }
 
-
   //Im not sure if this delay is needed. But leaving it in for safekeeping.
   delay(1000);
-
 }
 
 //Timer that fires to send each RTTY bit. From Upu
@@ -199,7 +189,7 @@ ISR(TIMER1_COMPA_vect)
     case 1: // Initialise transmission, take a copy of the string so it doesn't change mid transmission.
       vbatt = ((3.2 / 1024)* analogRead(A0) * 11.2); // ((vcc / maxADC)* adcreading * voltageDividerRatio)
       dtostrf(vbatt,3,2,vbatts); // convert lat from float to string
-      
+
       radio1.write(0x0F, 0x00); // RF22_REG_0F_ADC_CONFIGURATION 0x0f  :  RF22_ADCSEL_INTERNAL_TEMPERATURE_SENSOR 0x00 Temprtature sensor, oo, yes plz
       radio1.write(0x12, 0x00); // set temp range (-64 - +64 degC)
       radio1.write(0x12, 0x20); // set ENTSOFF (wtf is that?)
@@ -207,8 +197,8 @@ ISR(TIMER1_COMPA_vect)
       delayMicroseconds(400); //wait > 350 us for ADC converstion
       xtemp = radio1.read(0x11); //Register 11h. ADC Value. What units this returns in I have no idea. Degrees bannana? - Oh its an ADC value, so probably 0-255
       caltemp = xtemp * 0.5 - 64 - 7;
-      
-        
+
+
       sprintf(datastring,"$$$$CHEAPO,%i,%06lu,%s,%s,%i,%i,%i%i,%s,%i",count,time,latstr,lonstr,alt,sats,gpsmode,psave,vbatts,caltemp); //put together all var into one string //now runs at end of loop()
       crccat(datastring + 4); //add checksum (lunars code)
       count = count + 1;
@@ -270,9 +260,10 @@ ISR(TIMER1_COMPA_vect)
       }
 
     }
-  } else
+  } 
+  else
   {
- // do nothing, radio is resetting.
+    // do nothing, radio is resetting.
   }
 }
 
@@ -409,30 +400,31 @@ uint16_t crccat(char *msg)
 void powercycle()
 {
   radioready = false; //radio down for reboot
-   
-   //The delay dosent seem to do anything, so run it loads of times. One day I will look into this.
-    for (int i = 0; i < 50; i++)  {
+
+  //The delay dosent seem to do anything, so run it loads of times. One day I will look into this.
+  for (int i = 0; i < 50; i++)  {
     digitalWrite(RFM22B_SDN, HIGH); //power down radio
     delay(500); //pause 500ms   
-    }
-  
+  }
+
   delay(500); //Attempt to pause 500ms. Not that delay() does anything here.
   setupRadio(); //turn on radio and set up
 }
 
 void navmode()
+{
+  uint8_t setNav[] = {
+    0xB5, 0x62, 0x06, 0x24, 0x24, 0x00, 0xFF, 0xFF, 0x06, 0x03, 0x00, 0x00, 0x00, 0x00, 0x10, 0x27, 0x00, 0x00, 0x05, 0x00, 0xFA, 0x00, 0xFA, 0x00, 0x64, 0x00, 0x2C, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x16, 0xDC                                };
+  while(!gps_set_sucess)
   {
-    uint8_t setNav[] = {
-        0xB5, 0x62, 0x06, 0x24, 0x24, 0x00, 0xFF, 0xFF, 0x06, 0x03, 0x00, 0x00, 0x00, 0x00, 0x10, 0x27, 0x00, 0x00, 0x05, 0x00, 0xFA, 0x00, 0xFA, 0x00, 0x64, 0x00, 0x2C, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x16, 0xDC                              };
-      while(!gps_set_sucess)
-      {
-        sendUBX(setNav, sizeof(setNav)/sizeof(uint8_t));
-        gps_set_sucess=getUBX_ACK(setNav);
-        delay(1000);
-      }
-      gps_set_sucess=0;
-      setgpsmode = true;
+    sendUBX(setNav, sizeof(setNav)/sizeof(uint8_t));
+    gps_set_sucess=getUBX_ACK(setNav);
+    delay(1000);
   }
+  gps_set_sucess=0;
+  setgpsmode = true;
+}
+
 
 
 
