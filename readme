@@ -3,4 +3,8 @@ Flight code for $$CHEAPO flight computer
 Just a simple uBlox NEO 6 GPS / RFM22B tracker
 
 
-Should be uploaded to "Arduino Pro or Pro Mini (3.3v, 8MHz) w/ ATmegs168p (breakout)
+Should be uploaded to "Arduino Pro or Pro Mini (3.3v, 8MHz) w/ ATmega328"
+
+Main tracker code is CHEAPO.INO in root directory, other code in subfolders should be treated as experimental/untested.
+
+Current hardware CHEAPOv4 http://chris-stubbs.co.uk/wp/?p=352
