@@ -123,8 +123,8 @@ void loop()
 
     unsigned long fix_age;
 
-    //If we have a good fix (>5 sats), enter uBlox Power save mode
-    if(sats > 5)
+    //If we have a good fix (>=5 sats), enter uBlox Power save mode
+    if(sats >= 5)
     {
       if(gps_powersave == false)
       {
