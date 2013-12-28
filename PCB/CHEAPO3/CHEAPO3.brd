@@ -131,7 +131,7 @@
 <text x="12.3825" y="64.77" size="1.6764" layer="21" font="vector">CHEAPO v3A</text>
 <text x="12.3825" y="60.96" size="1.6764" layer="21" font="vector">HAB TRACKER</text>
 <text x="31.4325" y="53.0225" size="1.6764" layer="22" font="vector" rot="MR0">IF FOUND PLEASE CALL</text>
-<text x="31.4325" y="50.4825" size="1.6764" layer="22" font="vector" rot="MR0">+447786270151</text>
+<text x="31.4325" y="50.4825" size="1.6764" layer="22" font="vector" rot="MR0">+44xxxxxxxxxx</text>
 <text x="31.4325" y="47.9425" size="1.6764" layer="22" font="vector" rot="MR0">CHRIS-STUBBS.CO.UK</text>
 </plain>
 <libraries>
@@ -2512,15 +2512,6 @@ design rules under a new name.</description>
 <wire x1="19.6575" y1="43.1525" x2="19.6575" y2="44.565" width="0.254" layer="1"/>
 </signal>
 </signals>
-<errors>
-<approved hash="4,1,d727b46cedd29ee5"/>
-<approved hash="4,1,b7a78287dfca1083"/>
-<approved hash="4,1,3a02866f8deda60e"/>
-<approved hash="4,16,d727b46cedd29ee5"/>
-<approved hash="4,16,bed81b9376dee7e9"/>
-<approved hash="4,16,b7a78287dfca1083"/>
-<approved hash="4,16,3a02866f8deda60e"/>
-</errors>
 </board>
 </drawing>
 </eagle>
